@@ -13,6 +13,10 @@ app = Flask(__name__)
 app.secret_key = os.urandom(24)
 CORS(app, supports_credentials=True)
 
+app.config['SESSION_COOKIE_SECURE'] = True
+app.config['SESSION_COOKIE_HTTPONLY'] = True
+app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+
 # Set up logging
 logging.basicConfig(filename='app.log', level=logging.DEBUG)
 
@@ -56,17 +60,27 @@ def index():
 @app.route('/login')
 def login():
     try:
-        authorization_url, state = flow.authorization_url()
-        session['state'] = state
+        # Generate a unique state
+        state = secrets.token_urlsafe(16)
+        session['oauth_state'] = state
+        
+        # Include state in the authorization URL
+        authorization_url, _ = flow.authorization_url(state=state)
+        
         logging.info(f"Generated authorization URL: {authorization_url}")
         return jsonify({'auth_url': authorization_url})
     except Exception as e:
         logging.error(f"Error in login route: {str(e)}")
         return jsonify({'error': 'Failed to initialize login flow'}), 500
-    
+
 @app.route('/oauth2callback')
 def oauth2callback():
     try:
+        # Verify state
+        state = request.args.get('state')
+        if state != session.get('oauth_state'):
+            raise ValueError("State mismatch. Possible CSRF attack.")
+        
         flow.fetch_token(authorization_response=request.url)
         credentials = flow.credentials
         session['credentials'] = credentials_to_dict(credentials)
