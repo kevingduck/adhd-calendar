@@ -2,9 +2,7 @@
 
 ## Overview
 
-ADHD Calendar is a lightweight web application designed to assist individuals with ADHD in managing their tasks and time more effectively. 
-
-The app allows users to quickly input tasks, which are then automatically scheduled in their Google Calendar based on AI-estimated durations.
+ADHD Calendar is a lightweight web application designed to assist individuals with ADHD in managing their tasks and time more effectively. The app allows users to quickly input tasks, which are then automatically scheduled in their Google Calendar based on AI-estimated durations.
 
 Key features:
 - Simple web interface for task input
@@ -31,7 +29,7 @@ Before you begin, ensure you have met the following requirements:
 
 2. Install the required Python packages:
    ```
-   pip install flask google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client requests
+   pip install -r requirements.txt
    ```
 
 3. Set up your Google OAuth 2.0 credentials:
@@ -65,24 +63,37 @@ Before you begin, ensure you have met the following requirements:
 
 ## Configuration
 
-1. In `app.py`, replace `'Your/Timezone'` with your actual timezone (e.g., 'America/New_York').
+1. In `app.py`, update the `redirect_uri` in the Flow configuration to match your domain:
+   ```python
+   flow = Flow.from_client_secrets_file(
+       'client_secret.json',
+       scopes=SCOPES,
+       redirect_uri='https://10cob.com/oauth2callback'
+   )
+   ```
 
 2. In `templates/index.html`, replace `YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com` with your actual Google Client ID.
+
+3. Update the Nginx configuration to proxy requests to your Flask app running on port 8000.
 
 ## Usage
 
 1. Start the Flask application:
    ```
-   python app.py
+   gunicorn --workers 3 --bind 0.0.0.0:8000 -m 007 app:app
    ```
 
-2. Open a web browser and navigate to `http://localhost:8000`
+2. Open a web browser and navigate to `https://10cob.com`
 
 3. Sign in with your Google account and grant the necessary permissions.
 
 4. Enter your tasks in the input field and click "Add Task".
 
 5. The app will estimate the task duration, find a suitable time slot, and add it to your Google Calendar.
+
+## Deployment
+
+The application is deployed on an EC2 instance and accessible at https://10cob.com. The server is configured with Nginx as a reverse proxy to the Flask application running on port 8000.
 
 ## Contributing
 
@@ -95,57 +106,6 @@ Contributions to the ADHD Calendar project are welcome. Please follow these step
 5. Push to the branch (`git push origin feature/AmazingFeature`)
 6. Open a Pull Request
 
-## Components:
-
-1. Frontend:
-   - Simple HTML/CSS/JavaScript single-page application
-   - Form for task input
-   - Google Sign-In button for Calendar authorization
-
-2. Backend (Flask):
-   - API endpoint for receiving tasks
-   - Google Calendar integration
-   - Groq API integration for task time estimation
-
-3. Database:
-   - SQLite for storing tasks and user information
-
-## Key Features:
-
-1. User Authentication:
-   - Google Sign-In for easy account creation and Calendar access
-
-2. Task Input:
-   - Simple form to enter task descriptions
-
-3. Automatic Scheduling:
-   - Use Groq API to estimate task duration
-   - Find suitable time slots in the user's Google Calendar
-   - Add tasks to the calendar automatically
-
-4. Task Management:
-   - View scheduled tasks
-   - Option to reschedule or mark tasks as complete
-
-## Basic Workflow:
-
-1. User visits the web app and signs in with Google
-2. User grants access to their Google Calendar
-3. User enters a task in the input form
-4. Backend processes the task:
-   - Estimates duration using Groq API
-   - Finds a suitable time slot in the user's calendar
-   - Schedules the task
-5. User sees confirmation and can view their scheduled tasks
-
-## Technology Stack:
-
-- Frontend: HTML, CSS, JavaScript (Vue.js or React could be added for more interactivity)
-- Backend: Python with Flask
-- Database: SQLite
-- APIs: Google Calendar API, Groq API
-- Deployment: EC2 instance (as previously discussed)
-
 ## License
 
 This project is licensed under the MIT License - see the `LICENSE` file for details.
@@ -155,4 +115,5 @@ This project is licensed under the MIT License - see the `LICENSE` file for deta
 - Google Calendar API
 - Groq API for task duration estimation
 - Flask web framework
-
+- Gunicorn WSGI HTTP Server
+- Nginx web server
