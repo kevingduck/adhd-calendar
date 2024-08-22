@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADHD Calendar</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        #taskForm { margin-top: 20px; }
+        #taskInput { width: 100%; padding: 10px; margin-bottom: 10px; }
+        #submitTask, #googleSignIn { padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        #message { margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <h1>ADHD Calendar</h1>
+    <div id="gSignInWrapper">
+        <button id="googleSignIn">Sign in with Google</button>
+    </div>
+    <div id="taskForm" style="display:none;">
+        <input type="text" id="taskInput" placeholder="Enter your task">
+        <button id="submitTask">Add Task</button>
+    </div>
+    <div id="message"></div>
+
+    <script>
+        document.getElementById('googleSignIn').addEventListener('click', function() {
+            fetch('/login')
+                .then(response => response.json())
+                .then(data => {
+                    window.location.href = data.auth_url;
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    document.getElementById('message').innerText = 'Error initiating login.';
+                });
+        });
+
+        document.getElementById('submitTask').addEventListener('click', function() {
+            var task = document.getElementById('taskInput').value;
+            fetch('/add_task', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({task: task}),
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.message) {
+                    document.getElementById('message').innerText = data.message + '. Scheduled for: ' + new Date(data.time).toLocaleString();
+                } else {
+                    document.getElementById('message').innerText = 'Error: ' + data.error;
+                }
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+                document.getElementById('message').innerText = 'Error adding task.';
+            });
+        });
+
+        // Check if user is already authenticated
+        fetch('/check_auth')
+            .then(response => response.json())
+            .then(data => {
+                if (data.authenticated) {
+                    document.getElementById('gSignInWrapper').style.display = 'none';
+                    document.getElementById('taskForm').style.display = 'block';
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+            });
+    </script>
+</body>
+</html>
