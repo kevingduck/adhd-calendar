@@ -76,7 +76,7 @@ Before you begin, ensure you have met the following requirements:
    python app.py
    ```
 
-2. Open a web browser and navigate to `http://localhost:5000`
+2. Open a web browser and navigate to `http://localhost:8000`
 
 3. Sign in with your Google account and grant the necessary permissions.
 
