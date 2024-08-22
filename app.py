@@ -1,4 +1,5 @@
 from flask import Flask, request, jsonify, render_template, session
+from flask_cors import CORS
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
@@ -9,6 +10,7 @@ import datetime
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
+CORS(app)
 
 # Configure Google OAuth2
 SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -41,7 +43,7 @@ def oauth2callback():
     flow.fetch_token(authorization_response=request.url)
     credentials = flow.credentials
     session['credentials'] = credentials_to_dict(credentials)
-    return '<script>window.close();</script>'  # Close the popup window
+    return '<script>window.close();</script>'
 
 @app.route('/check_auth')
 def check_auth():
