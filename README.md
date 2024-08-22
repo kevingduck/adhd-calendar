@@ -1,8 +1,8 @@
-# ADHD Helper Web App
+# ADHD Calendar
 
 ## Overview
 
-ADHD Helper is a lightweight web application designed to assist individuals with ADHD in managing their tasks and time more effectively. 
+ADHD Calendar is a lightweight web application designed to assist individuals with ADHD in managing their tasks and time more effectively. 
 
 The app allows users to quickly input tasks, which are then automatically scheduled in their Google Calendar based on AI-estimated durations.
 
@@ -25,8 +25,8 @@ Before you begin, ensure you have met the following requirements:
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/adhd-helper.git
-   cd adhd-helper
+   git clone https://github.com/yourusername/adhd-calendar.git
+   cd adhd-calendar
    ```
 
 2. Install the required Python packages:
@@ -86,7 +86,7 @@ Before you begin, ensure you have met the following requirements:
 
 ## Contributing
 
-Contributions to the ADHD Helper project are welcome. Please follow these steps:
+Contributions to the ADHD Calendar project are welcome. Please follow these steps:
 
 1. Fork the repository
 2. Create a new branch (`git checkout -b feature/AmazingFeature`)
