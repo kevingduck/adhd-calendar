@@ -95,6 +95,57 @@ Contributions to the ADHD Calendar project are welcome. Please follow these step
 5. Push to the branch (`git push origin feature/AmazingFeature`)
 6. Open a Pull Request
 
+## Components:
+
+1. Frontend:
+   - Simple HTML/CSS/JavaScript single-page application
+   - Form for task input
+   - Google Sign-In button for Calendar authorization
+
+2. Backend (Flask):
+   - API endpoint for receiving tasks
+   - Google Calendar integration
+   - Groq API integration for task time estimation
+
+3. Database:
+   - SQLite for storing tasks and user information
+
+## Key Features:
+
+1. User Authentication:
+   - Google Sign-In for easy account creation and Calendar access
+
+2. Task Input:
+   - Simple form to enter task descriptions
+
+3. Automatic Scheduling:
+   - Use Groq API to estimate task duration
+   - Find suitable time slots in the user's Google Calendar
+   - Add tasks to the calendar automatically
+
+4. Task Management:
+   - View scheduled tasks
+   - Option to reschedule or mark tasks as complete
+
+## Basic Workflow:
+
+1. User visits the web app and signs in with Google
+2. User grants access to their Google Calendar
+3. User enters a task in the input form
+4. Backend processes the task:
+   - Estimates duration using Groq API
+   - Finds a suitable time slot in the user's calendar
+   - Schedules the task
+5. User sees confirmation and can view their scheduled tasks
+
+## Technology Stack:
+
+- Frontend: HTML, CSS, JavaScript (Vue.js or React could be added for more interactivity)
+- Backend: Python with Flask
+- Database: SQLite
+- APIs: Google Calendar API, Groq API
+- Deployment: EC2 instance (as previously discussed)
+
 ## License
 
 This project is licensed under the MIT License - see the `LICENSE` file for details.
