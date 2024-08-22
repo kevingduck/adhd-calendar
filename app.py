@@ -1,9 +1,10 @@
+import sqlite3
+import logging
 from flask import Flask, request, jsonify, render_template, session
 from flask_cors import CORS
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
 from googleapiclient.discovery import build
-import sqlite3
 import requests
 import os
 import datetime
@@ -11,6 +12,9 @@ import datetime
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
 CORS(app, supports_credentials=True)
+
+# Set up logging
+logging.basicConfig(filename='app.log', level=logging.DEBUG)
 
 # Configure Google OAuth2
 SCOPES = ['https://www.googleapis.com/auth/calendar']
@@ -21,8 +25,24 @@ flow = Flow.from_client_secrets_file(
 )
 
 # Groq API setup
-GROQ_API_KEY = os.environ['GROQ_API_KEY']
+GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
+if not GROQ_API_KEY:
+    logging.error("GROQ_API_KEY is not set in environment variables")
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
+def init_db():
+    conn = sqlite3.connect('tasks.db')
+    c = conn.cursor()
+    c.execute('''CREATE TABLE IF NOT EXISTS tasks
+                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
+                  user_id TEXT NOT NULL,
+                  description TEXT NOT NULL,
+                  status TEXT NOT NULL,
+                  scheduled_time TEXT,
+                  estimated_duration INTEGER)''')
+    conn.commit()
+    conn.close()
+    logging.info("Database initialized successfully")
 
 def get_db_connection():
     conn = sqlite3.connect('tasks.db')
@@ -38,9 +58,10 @@ def login():
     try:
         authorization_url, state = flow.authorization_url()
         session['state'] = state
+        logging.info(f"Generated authorization URL: {authorization_url}")
         return jsonify({'auth_url': authorization_url})
     except Exception as e:
-        print(f"Error in login route: {str(e)}")
+        logging.error(f"Error in login route: {str(e)}")
         return jsonify({'error': 'Failed to initialize login flow'}), 500
     
 @app.route('/oauth2callback')
@@ -49,9 +70,10 @@ def oauth2callback():
         flow.fetch_token(authorization_response=request.url)
         credentials = flow.credentials
         session['credentials'] = credentials_to_dict(credentials)
+        logging.info("Successfully fetched OAuth2 token")
         return '<script>window.close();</script>'
     except Exception as e:
-        print(f"Error in oauth2callback: {str(e)}")
+        logging.error(f"Error in oauth2callback: {str(e)}")
         return f'<script>alert("Authentication failed: {str(e)}"); window.close();</script>'
 
 @app.route('/check_auth')
@@ -65,24 +87,34 @@ def add_task():
     if 'credentials' not in session:
         return jsonify({'error': 'User not authenticated'}), 401
     
-    task_description = request.json['task']
+    task_description = request.json.get('task')
+    if not task_description:
+        return jsonify({'error': 'Task description is required'}), 400
     
-    estimated_time = estimate_task_time(task_description)
-    suitable_slot = find_free_time_slot(estimated_time)
-    
-    if suitable_slot:
-        add_event_to_calendar(task_description, suitable_slot, estimated_time)
-        save_task_to_db(session['credentials']['client_id'], task_description, 'Scheduled', suitable_slot, estimated_time)
-        return jsonify({
-            'message': 'Task scheduled successfully',
-            'time': suitable_slot.isoformat(),
-            'duration': estimated_time
-        })
-    else:
-        save_task_to_db(session['credentials']['client_id'], task_description, 'Unscheduled', None, estimated_time)
-        return jsonify({'error': 'Could not find a suitable time slot'}), 400
+    try:
+        estimated_time = estimate_task_time(task_description)
+        suitable_slot = find_free_time_slot(estimated_time)
+        
+        if suitable_slot:
+            add_event_to_calendar(task_description, suitable_slot, estimated_time)
+            save_task_to_db(session['credentials']['client_id'], task_description, 'Scheduled', suitable_slot, estimated_time)
+            return jsonify({
+                'message': 'Task scheduled successfully',
+                'time': suitable_slot.isoformat(),
+                'duration': estimated_time
+            })
+        else:
+            save_task_to_db(session['credentials']['client_id'], task_description, 'Unscheduled', None, estimated_time)
+            return jsonify({'error': 'Could not find a suitable time slot'}), 400
+    except Exception as e:
+        logging.error(f"Error in add_task: {str(e)}")
+        return jsonify({'error': 'Failed to add task'}), 500
 
 def estimate_task_time(task_description):
+    if not GROQ_API_KEY:
+        logging.error("GROQ_API_KEY is not set")
+        return 60  # Default to 1 hour if API key is not set
+
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
         "Content-Type": "application/json"
@@ -97,16 +129,14 @@ def estimate_task_time(task_description):
         "max_tokens": 100
     }
     
-    response = requests.post(GROQ_API_URL, headers=headers, json=payload)
-    if response.status_code == 200:
+    try:
+        response = requests.post(GROQ_API_URL, headers=headers, json=payload)
+        response.raise_for_status()
         estimate = response.json()['choices'][0]['message']['content']
-        try:
-            return int(estimate.split()[0])  # Assume the first word is the number of minutes
-        except ValueError:
-            return 60  # Default to 1 hour if parsing fails
-    else:
-        print(f"Error from Groq API: {response.text}")
-        return 60  # Default to 1 hour if API call fails
+        return int(estimate.split()[0])  # Assume the first word is the number of minutes
+    except Exception as e:
+        logging.error(f"Error estimating task time: {str(e)}")
+        return 60  # Default to 1 hour if API call fails or parsing fails
 
 def find_free_time_slot(duration):
     credentials = Credentials(**session['credentials'])
@@ -142,11 +172,16 @@ def add_event_to_calendar(task, start_time, duration):
     service.events().insert(calendarId='primary', body=event).execute()
 
 def save_task_to_db(user_id, description, status, scheduled_time, estimated_duration):
-    conn = get_db_connection()
-    conn.execute('INSERT INTO tasks (user_id, description, status, scheduled_time, estimated_duration) VALUES (?, ?, ?, ?, ?)',
-                 (user_id, description, status, scheduled_time, estimated_duration))
-    conn.commit()
-    conn.close()
+    try:
+        conn = get_db_connection()
+        conn.execute('INSERT INTO tasks (user_id, description, status, scheduled_time, estimated_duration) VALUES (?, ?, ?, ?, ?)',
+                     (user_id, description, status, scheduled_time, estimated_duration))
+        conn.commit()
+    except sqlite3.Error as e:
+        logging.error(f"Database error: {str(e)}")
+        raise
+    finally:
+        conn.close()
 
 def credentials_to_dict(credentials):
     return {
@@ -159,4 +194,5 @@ def credentials_to_dict(credentials):
     }
 
 if __name__ == '__main__':
+    init_db()  # Initialize the database before running the app
     app.run(host='0.0.0.0', port=8000, debug=False)
