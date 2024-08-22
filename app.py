@@ -17,7 +17,7 @@ SCOPES = ['https://www.googleapis.com/auth/calendar']
 flow = Flow.from_client_secrets_file(
     'client_secret.json',
     scopes=SCOPES,
-    redirect_uri='http://localhost:8000/oauth2callback'
+    redirect_uri='https://10cob.com/oauth2callback'
 )
 
 # Groq API setup
