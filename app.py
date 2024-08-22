@@ -10,14 +10,15 @@ import datetime
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
-CORS(app)
+CORS(app, supports_credentials=True)
 
 # Configure Google OAuth2
 SCOPES = ['https://www.googleapis.com/auth/calendar']
 flow = Flow.from_client_secrets_file(
     'client_secret.json',
-    scopes=SCOPES)
-flow.redirect_uri = 'http://localhost:5000/oauth2callback'
+    scopes=SCOPES,
+    redirect_uri='http://localhost:5000/oauth2callback'
+)
 
 # Groq API setup
 GROQ_API_KEY = os.environ['GROQ_API_KEY']
@@ -34,16 +35,24 @@ def index():
 
 @app.route('/login')
 def login():
-    authorization_url, state = flow.authorization_url()
-    session['state'] = state
-    return jsonify({'auth_url': authorization_url})
-
+    try:
+        authorization_url, state = flow.authorization_url()
+        session['state'] = state
+        return jsonify({'auth_url': authorization_url})
+    except Exception as e:
+        print(f"Error in login route: {str(e)}")
+        return jsonify({'error': 'Failed to initialize login flow'}), 500
+    
 @app.route('/oauth2callback')
 def oauth2callback():
-    flow.fetch_token(authorization_response=request.url)
-    credentials = flow.credentials
-    session['credentials'] = credentials_to_dict(credentials)
-    return '<script>window.close();</script>'
+    try:
+        flow.fetch_token(authorization_response=request.url)
+        credentials = flow.credentials
+        session['credentials'] = credentials_to_dict(credentials)
+        return '<script>window.close();</script>'
+    except Exception as e:
+        print(f"Error in oauth2callback: {str(e)}")
+        return f'<script>alert("Authentication failed: {str(e)}"); window.close();</script>'
 
 @app.route('/check_auth')
 def check_auth():
@@ -150,4 +159,4 @@ def credentials_to_dict(credentials):
     }
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)
