@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
 import re
+import random
 
 # Load environment variables
 load_dotenv()
@@ -33,6 +34,58 @@ class Task(db.Model):
 with app.app_context():
     db.create_all()
 
+def populate_calendar():
+    # Clear existing tasks
+    Task.query.delete()
+
+    # List of sample tasks
+    sample_tasks = [
+        "Team Meeting", "Project Review", "Client Call", "Lunch Break", "Gym Session",
+        "Code Review", "Brainstorming Session", "One-on-One with Manager", "Training Workshop",
+        "Email Management", "Report Writing", "Bug Fixing", "Feature Development",
+        "Design Review", "User Testing", "Documentation", "Performance Review",
+        "Strategy Planning", "Team Building Activity", "Presentation Preparation"
+    ]
+
+    # Get the date for the start of the current week (Monday)
+    today = datetime.now()
+    start_of_week = today - timedelta(days=today.weekday())
+
+    # Generate events for each day of the week
+    for day in range(7):  # 0 = Monday, 6 = Sunday
+        current_date = start_of_week + timedelta(days=day)
+        
+        # Skip Saturday and Sunday
+        if day in [5, 6]:
+            continue
+        
+        # Generate 3-5 events for each weekday
+        num_events = random.randint(3, 5)
+        for _ in range(num_events):
+            task = random.choice(sample_tasks)
+            duration = random.choice([15, 30, 60, 90, 120]) 
+            
+            # Generate a random start time between 9 AM and 5 PM
+            start_hour = random.randint(9, 16)
+            start_minute = random.choice([0, 15, 30, 45])
+            start_time = current_date.replace(hour=start_hour, minute=start_minute, second=0, microsecond=0)
+            end_time = start_time + timedelta(minutes=duration)
+            
+            # Ensure the event doesn't go past 6 PM
+            if end_time.hour >= 18:
+                end_time = end_time.replace(hour=18, minute=0)
+            
+            new_task = Task(
+                task=task,
+                estimated_time=duration,
+                ai_response=f"ESTIMATE: {duration} minutes - {task}",
+                start=start_time,
+                end=end_time
+            )
+            db.session.add(new_task)
+    
+    db.session.commit()
+
 def extract_time_estimate(response_text):
     match = re.search(r'ESTIMATE:\s*(\d+)\s*minutes', response_text, re.IGNORECASE)
     if match:
@@ -48,7 +101,11 @@ def get_available_slots(duration_minutes, start_date=None):
     
     current_time = start_date.replace(hour=9, minute=0, second=0, microsecond=0)  # Start at 9 AM
     while current_time < end_date:
-        if current_time.hour >= 22:  # End at 10 PM
+        if current_time.hour >= 18:  # End at 6 PM
+            current_time = (current_time + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+            continue
+        
+        if current_time.weekday() >= 5:  # Skip weekends
             current_time = (current_time + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
             continue
         
@@ -98,23 +155,20 @@ def index():
         suggests when to schedule them. Interactions go like this:
         1. I tell you a task 
 
-        2. You can ask for more information in as few words as possible. No more than 8 words.
-        For instance, if I say "Clean my room," you ask "Room size?" 
+        2. You can ask for more information in as few words as possible. No more than 5 words.
+        For instance, if I say "Clean my room," you ask "Room size?"
 
-        DO NOT ADD ANY OTHER INFORMATION.
+        DO NOT ADD ANY OTHER INFORMATION IN THIS STEP. JUST ASK FOR MORE INFORMATION.
 
-        3. After I provide the information, you figure out the time it will take and look at
-        calendar to find a time slot and respond with a final resonse.
+        3. After I provide the information, you estimate the time it will take and look at
+        calendar to find a time slot.
         
         Your final response should be formatted like this:
-        "{task-name} ({est-min}): {date} {start-time} - {end-time}". 
-        For example, "Clean Room (30): Mon Aug 22 2:00PM - 2:30PM".
-        
-        #Example interaction:
-        - I say "Clean my room."
-        - You say "Room size?"
-        - I say "200sqft."
-        - You say "Clean Room (30): Mon Aug 22 2:00PM - 2:30PM".
+        "ESTIMATE: {est-min} minutes - {task-name}". 
+        For example, "ESTIMATE: 30 minutes - Clean Room".
+
+        DO NOT ADD ANY OTHER INFORMATION IN THIS STEP. JUST PROVIDE THE REQUESTED INFORMATION 
+        IN THE REQUESTED FORMAT.
         """
         response = groq_client.chat.completions.create(
             messages=[
@@ -169,7 +223,7 @@ def index():
             'title': task.task,
             'start': task.start.isoformat(),
             'end': task.end.isoformat(),
-            'color': '#28a745',  # green for tasks
+            'color': '#3788d8',  # blue for existing tasks
             'extendedProps': {
                 'aiResponse': task.ai_response
             }
@@ -178,5 +232,7 @@ def index():
     return render_template('index.html', calendar_events=calendar_events, follow_up_question=follow_up_question, error=error)
 
 if __name__ == "__main__":
+    with app.app_context():
+        populate_calendar()  # Populate the calendar when the app starts
     port = int(os.getenv('PORT', 8080))
     app.run(host='0.0.0.0', port=port, debug=True)
