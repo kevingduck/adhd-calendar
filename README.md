@@ -1,84 +1,69 @@
-# ADHD Calendar
+# Task Scheduler with AI Assistant
 
-ADHD Calendar is a Flask-based web application designed to help individuals with ADHD manage their tasks and schedule more effectively. It uses AI to estimate task durations and automatically schedules tasks in available time slots.
+## Overview
+
+This project is a task scheduling application that uses an AI assistant to help estimate task durations and suggest scheduling times. It's designed to help users manage their time more effectively by leveraging AI insights.
+
+**Note: This project is currently a work in progress and may have limitations or bugs.**
 
 ## Features
 
-- AI-powered task duration estimation
-- Automatic task scheduling based on available time slots
-- Interactive calendar interface
-- Randomly generated events to simulate a realistic schedule
-- Persistence of tasks using SQLite database
-
-## Technologies Used
-
-- Flask: Web framework
-- SQLAlchemy: ORM for database management
-- Groq: AI model for task estimation
-- FullCalendar: JavaScript calendar library
-- SQLite: Database for storing tasks
+- Input tasks and get AI-assisted time estimates
+- AI-suggested scheduling based on your existing calendar
+- Simple calendar view of scheduled tasks
 
 ## Prerequisites
 
-Before you begin, ensure you have met the following requirements:
+- Node.js (v14 or later recommended)
+- PostgreSQL database
+- Groq API key
 
-- Python 3.7+
-- pip (Python package manager)
-- A Groq API key
-
-## Installation
+## Setup
 
 1. Clone the repository:
    ```
-   git clone https://github.com/yourusername/adhd-calendar.git
-   cd adhd-calendar
+   git clone https://github.com/yourusername/task-scheduler-ai.git
+   cd task-scheduler-ai
    ```
 
-2. Create a virtual environment and activate it:
+2. Install dependencies:
    ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
-   ```
-
-3. Install the required packages:
-   ```
-   pip install -r requirements.txt
+   npm install
    ```
 
-4. Create a `.env` file in the project root and add your Groq API key:
+3. Set up your environment variables:
+   Create a `.env` file in the root directory with the following contents:
    ```
-   GROQ_API_KEY=your_groq_api_key_here
+   DB_USER=your_database_user
+   DB_HOST=your_database_host
+   DB_NAME=your_database_name
+   DB_PASSWORD=your_database_password
+   DB_PORT=your_database_port
+   GROQ_API_KEY=your_groq_api_key
    ```
 
-## Usage
+4. Set up your PostgreSQL database:
+   - Create a new database
+   - Create a `calendar_items` table (schema to be provided)
 
-1. Start the Flask application:
+5. Start the server:
    ```
-   python app.py
+   node app.js
    ```
 
-2. Open a web browser and navigate to `http://localhost:8080`
+6. Open a web browser and navigate to `http://localhost:3000`
 
-3. You'll see a calendar populated with random events for the current week.
+## Current Limitations
 
-4. To add a new task:
-   - Enter the task description in the input field and click "Add Task"
-   - If the AI needs more information, it will ask a follow-up question
-   - Once the AI has enough information, it will estimate the task duration and schedule it in an available time slot
-
-5. View your scheduled tasks on the calendar
+- The AI responses may sometimes be inconsistent
+- Error handling is basic and may not cover all edge cases
+- The UI is minimal and may lack some user-friendly features
+- Calendar functionality is limited
 
 ## Contributing
 
-Contributions to the ADHD Calendar project are welcome. Please feel free to submit a Pull Request.
+As this is a work in progress, contributions are welcome! Please feel free to submit issues or pull requests.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgements
-
-- [Flask](https://flask.palletsprojects.com/)
-- [SQLAlchemy](https://www.sqlalchemy.org/)
-- [Groq](https://groq.com/)
-- [FullCalendar](https://fullcalendar.io/)
+[MIT License](https://opensource.org/licenses/MIT)

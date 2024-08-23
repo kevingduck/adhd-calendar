@@ -1,0 +1,94 @@
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #333;
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 20px;
+    background-color: #f5f5f5;
+}
+
+#app {
+    background-color: #ffffff;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 20px;
+}
+
+h1, h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+#task-input {
+    display: flex;
+    margin-bottom: 20px;
+}
+
+#task-description {
+    flex-grow: 1;
+    padding: 10px;
+    font-size: 16px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    font-size: 16px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    border-radius: 4px;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.task-item, .calendar-item {
+    background-color: #ecf0f1;
+    border-left: 4px solid #3498db;
+    margin-bottom: 10px;
+    padding: 15px;
+    border-radius: 4px;
+}
+
+.task-item h3, .calendar-item h3 {
+    margin-top: 0;
+    color: #2c3e50;
+}
+
+.task-item p, .calendar-item p {
+    margin: 5px 0;
+}
+
+.task-item button {
+    margin-right: 10px;
+}
+
+#ai-interaction {
+    background-color: #e8f4fd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+#ai-interaction input {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border: 1px solid #bdc3c7;
+    border-radius: 4px;
+}
+
+#ai-interaction button {
+    margin-top: 10px;
+}
+
+#calendar {
+    margin-top: 30px;
+}
