@@ -1,6 +1,6 @@
 from flask import Flask, request, render_template, redirect, url_for, session, jsonify
+from flask_sqlalchemy import SQLAlchemy
 from groq import Groq
-import csv
 from datetime import datetime, timedelta
 import os
 from dotenv import load_dotenv
@@ -11,20 +11,27 @@ load_dotenv()
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)  # For session management
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///tasks.db'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+db = SQLAlchemy(app)
 
 # Initialize Groq client using the API key from environment variables
 groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 
-# Dummy calendar with some existing entries
-dummy_calendar = [
-    {"task": "Team Meeting", "start": "2024-08-22T09:00:00", "end": "2024-08-22T10:00:00"},
-    {"task": "Lunch Break", "start": "2024-08-22T12:00:00", "end": "2024-08-22T13:00:00"},
-    {"task": "Project Deadline", "start": "2024-08-22T16:00:00", "end": "2024-08-22T17:00:00"},
-    {"task": "Gym", "start": "2024-08-22T18:00:00", "end": "2024-08-22T19:30:00"},
-]
+class Task(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    task = db.Column(db.String(200), nullable=False)
+    estimated_time = db.Column(db.Integer, nullable=False)
+    ai_response = db.Column(db.Text, nullable=True)
+    start = db.Column(db.DateTime, nullable=False)
+    end = db.Column(db.DateTime, nullable=False)
 
-# Simulated calendar for new tasks
-calendar = []
+    def __repr__(self):
+        return f'<Task {self.task}>'
+
+# Create the database tables
+with app.app_context():
+    db.create_all()
 
 def extract_time_estimate(response_text):
     match = re.search(r'ESTIMATE:\s*(\d+)\s*minutes', response_text, re.IGNORECASE)
@@ -32,27 +39,29 @@ def extract_time_estimate(response_text):
         return int(match.group(1))
     return 60  # Default to 60 minutes if no estimate found
 
-def get_available_slots(duration_minutes):
-    available_slots = []
-    now = datetime.now()
-    end_of_day = now.replace(hour=22, minute=0, second=0, microsecond=0)
+def get_available_slots(duration_minutes, start_date=None):
+    if start_date is None:
+        start_date = datetime.now()
     
-    current_time = now
-    while current_time < end_of_day:
+    end_date = start_date + timedelta(days=7)
+    available_slots = []
+    
+    current_time = start_date.replace(hour=9, minute=0, second=0, microsecond=0)  # Start at 9 AM
+    while current_time < end_date:
+        if current_time.hour >= 22:  # End at 10 PM
+            current_time = (current_time + timedelta(days=1)).replace(hour=9, minute=0, second=0, microsecond=0)
+            continue
+        
         slot_end = current_time + timedelta(minutes=duration_minutes)
-        if slot_end > end_of_day:
-            break
         
-        is_available = True
-        for event in dummy_calendar + calendar:
-            event_start = datetime.fromisoformat(event['start'])
-            event_end = datetime.fromisoformat(event['end'])
-            if (current_time < event_end and slot_end > event_start):
-                is_available = False
-                current_time = event_end
-                break
+        # Check if the slot overlaps with any existing tasks
+        overlapping_tasks = Task.query.filter(
+            ((Task.start <= current_time) & (Task.end > current_time)) |
+            ((Task.start < slot_end) & (Task.end >= slot_end)) |
+            ((Task.start >= current_time) & (Task.end <= slot_end))
+        ).all()
         
-        if is_available:
+        if not overlapping_tasks:
             available_slots.append({
                 'start': current_time.isoformat(),
                 'end': slot_end.isoformat()
@@ -79,8 +88,9 @@ def index():
         
         # Prepare the current schedule for the AI
         current_schedule = "Current schedule:\n"
-        for event in dummy_calendar + calendar:
-            current_schedule += f"{event['task']}: {event['start']} - {event['end']}\n"
+        tasks = Task.query.all()
+        for task in tasks:
+            current_schedule += f"{task.task}: {task.start.isoformat()} - {task.end.isoformat()}\n"
         
         # Send conversation to Groq for estimation
         prompt = """
@@ -88,15 +98,23 @@ def index():
         suggests when to schedule them. Interactions go like this:
         1. I tell you a task 
 
-        2. You can ask for more information in as few words as possible. No more than 10 words.
-        For instance, if I say "Clean my room," you ask "Room size?"
+        2. You can ask for more information in as few words as possible. No more than 8 words.
+        For instance, if I say "Clean my room," you ask "Room size?" 
 
-        3. After I provide the information, you estimate the time it will take and look at
-        calendar to find a time slot.
+        DO NOT ADD ANY OTHER INFORMATION.
+
+        3. After I provide the information, you figure out the time it will take and look at
+        calendar to find a time slot and respond with a final resonse.
         
         Your final response should be formatted like this:
         "{task-name} ({est-min}): {date} {start-time} - {end-time}". 
         For example, "Clean Room (30): Mon Aug 22 2:00PM - 2:30PM".
+        
+        #Example interaction:
+        - I say "Clean my room."
+        - You say "Room size?"
+        - I say "200sqft."
+        - You say "Clean Room (30): Mon Aug 22 2:00PM - 2:30PM".
         """
         response = groq_client.chat.completions.create(
             messages=[
@@ -124,47 +142,36 @@ def index():
                 start_time = datetime.fromisoformat(slot['start'])
                 end_time = datetime.fromisoformat(slot['end'])
                 
-                calendar.append({
-                    'task': session['task'],
-                    'estimated_time': estimated_time,
-                    'ai_response': ai_response,
-                    'start': start_time.isoformat(),
-                    'end': end_time.isoformat()
-                })
-
-                # Save to CSV
-                with open('tasks.csv', 'a', newline='') as csvfile:
-                    writer = csv.DictWriter(csvfile, fieldnames=['task', 'estimated_time', 'ai_response', 'start', 'end'])
-                    if csvfile.tell() == 0:
-                        writer.writeheader()
-                    writer.writerow(calendar[-1])
+                new_task = Task(
+                    task=session['task'],
+                    estimated_time=estimated_time,
+                    ai_response=ai_response,
+                    start=start_time,
+                    end=end_time
+                )
+                db.session.add(new_task)
+                db.session.commit()
 
                 # Clear the session
                 session.pop('task', None)
                 session.pop('conversation', None)
             else:
-                error = "No available time slots found for this task."
+                error = "No available time slots found for this task within the next week."
         else:
             # AI asked a follow-up question
             follow_up_question = ai_response
 
     # Prepare calendar events
     calendar_events = []
-    for event in dummy_calendar:
+    tasks = Task.query.all()
+    for task in tasks:
         calendar_events.append({
-            'title': event['task'],
-            'start': event['start'],
-            'end': event['end'],
-            'color': '#3788d8'  # blue for dummy events
-        })
-    for task in calendar:
-        calendar_events.append({
-            'title': task['task'],
-            'start': task['start'],
-            'end': task['end'],
-            'color': '#28a745',  # green for new tasks
+            'title': task.task,
+            'start': task.start.isoformat(),
+            'end': task.end.isoformat(),
+            'color': '#28a745',  # green for tasks
             'extendedProps': {
-                'aiResponse': task['ai_response']
+                'aiResponse': task.ai_response
             }
         })
 
