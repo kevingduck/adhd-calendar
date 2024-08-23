@@ -1,213 +1,175 @@
-import secrets
-import sqlite3
-import logging
-from flask import Flask, request, jsonify, render_template, session
-from flask_cors import CORS
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
-from googleapiclient.discovery import build
-import requests
+from flask import Flask, request, render_template, redirect, url_for, session, jsonify
+from groq import Groq
+import csv
+from datetime import datetime, timedelta
 import os
-import datetime
+from dotenv import load_dotenv
+import re
+
+# Load environment variables
+load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = os.urandom(24)
-CORS(app, supports_credentials=True)
+app.secret_key = os.urandom(24)  # For session management
 
-app.config['SESSION_COOKIE_SECURE'] = True
-app.config['SESSION_COOKIE_HTTPONLY'] = True
-app.config['SESSION_COOKIE_SAMESITE'] = 'None'
+# Initialize Groq client using the API key from environment variables
+groq_client = Groq(api_key=os.getenv('GROQ_API_KEY'))
 
-# Set up logging
-logging.basicConfig(filename='app.log', level=logging.DEBUG)
+# Dummy calendar with some existing entries
+dummy_calendar = [
+    {"task": "Team Meeting", "start": "2024-08-22T09:00:00", "end": "2024-08-22T10:00:00"},
+    {"task": "Lunch Break", "start": "2024-08-22T12:00:00", "end": "2024-08-22T13:00:00"},
+    {"task": "Project Deadline", "start": "2024-08-22T16:00:00", "end": "2024-08-22T17:00:00"},
+    {"task": "Gym", "start": "2024-08-22T18:00:00", "end": "2024-08-22T19:30:00"},
+]
 
-# Configure Google OAuth2
-SCOPES = ['https://www.googleapis.com/auth/calendar']
-flow = Flow.from_client_secrets_file(
-    'client_secret.json',
-    scopes=SCOPES,
-    redirect_uri='https://10cob.com/oauth2callback'
-)
+# Simulated calendar for new tasks
+calendar = []
 
-# Groq API setup
-GROQ_API_KEY = os.environ.get('GROQ_API_KEY')
-if not GROQ_API_KEY:
-    logging.error("GROQ_API_KEY is not set in environment variables")
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+def extract_time_estimate(response_text):
+    match = re.search(r'ESTIMATE:\s*(\d+)\s*minutes', response_text, re.IGNORECASE)
+    if match:
+        return int(match.group(1))
+    return 60  # Default to 60 minutes if no estimate found
 
-def init_db():
-    conn = sqlite3.connect('tasks.db')
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS tasks
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  user_id TEXT NOT NULL,
-                  description TEXT NOT NULL,
-                  status TEXT NOT NULL,
-                  scheduled_time TEXT,
-                  estimated_duration INTEGER)''')
-    conn.commit()
-    conn.close()
-    logging.info("Database initialized successfully")
-
-def get_db_connection():
-    conn = sqlite3.connect('tasks.db')
-    conn.row_factory = sqlite3.Row
-    return conn
-
-@app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/login')
-def login():
-    try:
-        # Generate a unique state
-        state = secrets.token_urlsafe(16)
-        session['oauth_state'] = state
-        
-        # Include state in the authorization URL
-        authorization_url, _ = flow.authorization_url(state=state)
-        
-        logging.info(f"Generated authorization URL: {authorization_url}")
-        return jsonify({'auth_url': authorization_url})
-    except Exception as e:
-        logging.error(f"Error in login route: {str(e)}")
-        return jsonify({'error': 'Failed to initialize login flow'}), 500
-
-@app.route('/oauth2callback')
-def oauth2callback():
-    try:
-        # Verify state
-        state = request.args.get('state')
-        if state != session.get('oauth_state'):
-            raise ValueError("State mismatch. Possible CSRF attack.")
-        
-        flow.fetch_token(authorization_response=request.url)
-        credentials = flow.credentials
-        session['credentials'] = credentials_to_dict(credentials)
-        logging.info("Successfully fetched OAuth2 token")
-        return '<script>window.close();</script>'
-    except Exception as e:
-        logging.error(f"Error in oauth2callback: {str(e)}")
-        return f'<script>alert("Authentication failed: {str(e)}"); window.close();</script>'
-
-@app.route('/check_auth')
-def check_auth():
-    if 'credentials' in session:
-        return jsonify({'authenticated': True})
-    return jsonify({'authenticated': False})
-
-@app.route('/add_task', methods=['POST'])
-def add_task():
-    if 'credentials' not in session:
-        return jsonify({'error': 'User not authenticated'}), 401
+def get_available_slots(duration_minutes):
+    available_slots = []
+    now = datetime.now()
+    end_of_day = now.replace(hour=22, minute=0, second=0, microsecond=0)
     
-    task_description = request.json.get('task')
-    if not task_description:
-        return jsonify({'error': 'Task description is required'}), 400
-    
-    try:
-        estimated_time = estimate_task_time(task_description)
-        suitable_slot = find_free_time_slot(estimated_time)
+    current_time = now
+    while current_time < end_of_day:
+        slot_end = current_time + timedelta(minutes=duration_minutes)
+        if slot_end > end_of_day:
+            break
         
-        if suitable_slot:
-            add_event_to_calendar(task_description, suitable_slot, estimated_time)
-            save_task_to_db(session['credentials']['client_id'], task_description, 'Scheduled', suitable_slot, estimated_time)
-            return jsonify({
-                'message': 'Task scheduled successfully',
-                'time': suitable_slot.isoformat(),
-                'duration': estimated_time
+        is_available = True
+        for event in dummy_calendar + calendar:
+            event_start = datetime.fromisoformat(event['start'])
+            event_end = datetime.fromisoformat(event['end'])
+            if (current_time < event_end and slot_end > event_start):
+                is_available = False
+                current_time = event_end
+                break
+        
+        if is_available:
+            available_slots.append({
+                'start': current_time.isoformat(),
+                'end': slot_end.isoformat()
             })
+            return available_slots  # Return the first available slot
+        
+        current_time += timedelta(minutes=15)  # Check every 15 minutes
+    
+    return available_slots
+
+@app.route("/", methods=['GET', 'POST'])
+def index():
+    error = None
+    follow_up_question = None
+
+    if request.method == 'POST':
+        if 'task' in request.form:
+            task = request.form['task']
+            session['task'] = task
+            session['conversation'] = [{"role": "user", "content": task}]
+        elif 'answer' in request.form:
+            answer = request.form['answer']
+            session['conversation'].append({"role": "user", "content": answer})
+        
+        # Prepare the current schedule for the AI
+        current_schedule = "Current schedule:\n"
+        for event in dummy_calendar + calendar:
+            current_schedule += f"{event['task']}: {event['start']} - {event['end']}\n"
+        
+        # Send conversation to Groq for estimation
+        prompt = """
+        You are an AI assistant that estimates the time required to complete tasks and 
+        suggests when to schedule them. Interactions go like this:
+        1. I tell you a task 
+
+        2. You can ask for more information in as few words as possible. No more than 10 words.
+        For instance, if I say "Clean my room," you ask "Room size?"
+
+        3. After I provide the information, you estimate the time it will take and look at
+        calendar to find a time slot.
+        
+        Your final response should be formatted like this:
+        "{task-name} ({est-min}): {date} {start-time} - {end-time}". 
+        For example, "Clean Room (30): Mon Aug 22 2:00PM - 2:30PM".
+        """
+        response = groq_client.chat.completions.create(
+            messages=[
+                {
+                    "role": "system",
+                    "content": prompt + current_schedule
+                },
+                *session['conversation']
+            ],
+            model="mixtral-8x7b-32768",
+            max_tokens=5000
+        )
+
+        ai_response = response.choices[0].message.content.strip()
+        print(f'AI Response: {ai_response}')
+        session['conversation'].append({"role": "assistant", "content": ai_response})
+
+        if ai_response.startswith("ESTIMATE:"):
+            # Extract the estimated time and schedule the task
+            estimated_time = extract_time_estimate(ai_response)
+            available_slots = get_available_slots(estimated_time)
+            
+            if available_slots:
+                slot = available_slots[0]
+                start_time = datetime.fromisoformat(slot['start'])
+                end_time = datetime.fromisoformat(slot['end'])
+                
+                calendar.append({
+                    'task': session['task'],
+                    'estimated_time': estimated_time,
+                    'ai_response': ai_response,
+                    'start': start_time.isoformat(),
+                    'end': end_time.isoformat()
+                })
+
+                # Save to CSV
+                with open('tasks.csv', 'a', newline='') as csvfile:
+                    writer = csv.DictWriter(csvfile, fieldnames=['task', 'estimated_time', 'ai_response', 'start', 'end'])
+                    if csvfile.tell() == 0:
+                        writer.writeheader()
+                    writer.writerow(calendar[-1])
+
+                # Clear the session
+                session.pop('task', None)
+                session.pop('conversation', None)
+            else:
+                error = "No available time slots found for this task."
         else:
-            save_task_to_db(session['credentials']['client_id'], task_description, 'Unscheduled', None, estimated_time)
-            return jsonify({'error': 'Could not find a suitable time slot'}), 400
-    except Exception as e:
-        logging.error(f"Error in add_task: {str(e)}")
-        return jsonify({'error': 'Failed to add task'}), 500
+            # AI asked a follow-up question
+            follow_up_question = ai_response
 
-def estimate_task_time(task_description):
-    if not GROQ_API_KEY:
-        logging.error("GROQ_API_KEY is not set")
-        return 60  # Default to 1 hour if API key is not set
+    # Prepare calendar events
+    calendar_events = []
+    for event in dummy_calendar:
+        calendar_events.append({
+            'title': event['task'],
+            'start': event['start'],
+            'end': event['end'],
+            'color': '#3788d8'  # blue for dummy events
+        })
+    for task in calendar:
+        calendar_events.append({
+            'title': task['task'],
+            'start': task['start'],
+            'end': task['end'],
+            'color': '#28a745',  # green for new tasks
+            'extendedProps': {
+                'aiResponse': task['ai_response']
+            }
+        })
 
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-    
-    payload = {
-        "model": "mixtral-8x7b-32768",
-        "messages": [
-            {"role": "system", "content": "You are an AI assistant that estimates the time required to complete tasks. Provide your estimate in minutes."},
-            {"role": "user", "content": f"Estimate the time in minutes to complete this task: {task_description}"}
-        ],
-        "max_tokens": 100
-    }
-    
-    try:
-        response = requests.post(GROQ_API_URL, headers=headers, json=payload)
-        response.raise_for_status()
-        estimate = response.json()['choices'][0]['message']['content']
-        return int(estimate.split()[0])  # Assume the first word is the number of minutes
-    except Exception as e:
-        logging.error(f"Error estimating task time: {str(e)}")
-        return 60  # Default to 1 hour if API call fails or parsing fails
+    return render_template('index.html', calendar_events=calendar_events, follow_up_question=follow_up_question, error=error)
 
-def find_free_time_slot(duration):
-    credentials = Credentials(**session['credentials'])
-    service = build('calendar', 'v3', credentials=credentials)
-    
-    now = datetime.datetime.utcnow().isoformat() + 'Z'
-    events_result = service.events().list(calendarId='primary', timeMin=now,
-                                          maxResults=10, singleEvents=True,
-                                          orderBy='startTime').execute()
-    events = events_result.get('items', [])
-    
-    if not events:
-        return datetime.datetime.now() + datetime.timedelta(hours=1)
-    
-    last_event_end = datetime.datetime.fromisoformat(events[-1]['end'].get('dateTime', events[-1]['end'].get('date')))
-    return last_event_end + datetime.timedelta(minutes=15)
-
-def add_event_to_calendar(task, start_time, duration):
-    credentials = Credentials(**session['credentials'])
-    service = build('calendar', 'v3', credentials=credentials)
-    
-    event = {
-        'summary': task,
-        'start': {
-            'dateTime': start_time.isoformat(),
-            'timeZone': 'America/New_York',
-        },
-        'end': {
-            'dateTime': (start_time + datetime.timedelta(minutes=duration)).isoformat(),
-            'timeZone': 'America/New_York',
-        },
-    }
-    service.events().insert(calendarId='primary', body=event).execute()
-
-def save_task_to_db(user_id, description, status, scheduled_time, estimated_duration):
-    try:
-        conn = get_db_connection()
-        conn.execute('INSERT INTO tasks (user_id, description, status, scheduled_time, estimated_duration) VALUES (?, ?, ?, ?, ?)',
-                     (user_id, description, status, scheduled_time, estimated_duration))
-        conn.commit()
-    except sqlite3.Error as e:
-        logging.error(f"Database error: {str(e)}")
-        raise
-    finally:
-        conn.close()
-
-def credentials_to_dict(credentials):
-    return {
-        'token': credentials.token,
-        'refresh_token': credentials.refresh_token,
-        'token_uri': credentials.token_uri,
-        'client_id': credentials.client_id,
-        'client_secret': credentials.client_secret,
-        'scopes': credentials.scopes
-    }
-
-if __name__ == '__main__':
-    init_db()  # Initialize the database before running the app
-    app.run(host='0.0.0.0', port=8000, debug=False)
+if __name__ == "__main__":
+    port = int(os.getenv('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=True)

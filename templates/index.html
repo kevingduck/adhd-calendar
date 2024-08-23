@@ -4,73 +4,58 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>ADHD Calendar</title>
+    <link href="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.2/main.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@5.10.2/main.min.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
-        #taskForm { margin-top: 20px; }
-        #taskInput { width: 100%; padding: 10px; margin-bottom: 10px; }
-        #submitTask, #googleSignIn { padding: 10px 20px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
-        #message { margin-top: 20px; }
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+        #calendar { max-width: 900px; margin: 0 auto; }
+        .task-form { margin-bottom: 20px; }
+        .error { color: red; }
     </style>
 </head>
 <body>
     <h1>ADHD Calendar</h1>
-    <div id="gSignInWrapper">
-        <button id="googleSignIn">Sign in with Google</button>
+    <div class="task-form">
+        {% if follow_up_question %}
+            <h2>Follow-up Question:</h2>
+            <p>{{ follow_up_question }}</p>
+            <form method="POST">
+                <input type="text" name="answer" placeholder="Your answer" required>
+                <button type="submit">Submit Answer</button>
+            </form>
+        {% else %}
+            <form method="POST">
+                <input type="text" name="task" placeholder="Enter your task" required>
+                <button type="submit">Add Task</button>
+            </form>
+        {% endif %}
     </div>
-    <div id="taskForm" style="display:none;">
-        <input type="text" id="taskInput" placeholder="Enter your task">
-        <button id="submitTask">Add Task</button>
-    </div>
-    <div id="message"></div>
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% endif %}
+    <div id="calendar"></div>
 
     <script>
-        document.getElementById('googleSignIn').addEventListener('click', function() {
-            fetch('/login')
-                .then(response => response.json())
-                .then(data => {
-                    window.location.href = data.auth_url;
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    document.getElementById('message').innerText = 'Error initiating login.';
-                });
-        });
-
-        document.getElementById('submitTask').addEventListener('click', function() {
-            var task = document.getElementById('taskInput').value;
-            fetch('/add_task', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
+        document.addEventListener('DOMContentLoaded', function() {
+            var calendarEl = document.getElementById('calendar');
+            var calendarEvents = JSON.parse('{{ calendar_events|tojson|safe }}');
+            
+            var calendar = new FullCalendar.Calendar(calendarEl, {
+                initialView: 'timeGridWeek',
+                headerToolbar: {
+                    left: 'prev,next today',
+                    center: 'title',
+                    right: 'dayGridMonth,timeGridWeek,timeGridDay'
                 },
-                body: JSON.stringify({task: task}),
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.message) {
-                    document.getElementById('message').innerText = data.message + '. Scheduled for: ' + new Date(data.time).toLocaleString();
-                } else {
-                    document.getElementById('message').innerText = 'Error: ' + data.error;
+                events: calendarEvents,
+                eventClick: function(info) {
+                    if (info.event.extendedProps.aiResponse) {
+                        alert('AI Response: ' + info.event.extendedProps.aiResponse);
+                    }
                 }
-            })
-            .catch((error) => {
-                console.error('Error:', error);
-                document.getElementById('message').innerText = 'Error adding task.';
             });
+            calendar.render();
         });
-
-        // Check if user is already authenticated
-        fetch('/check_auth')
-            .then(response => response.json())
-            .then(data => {
-                if (data.authenticated) {
-                    document.getElementById('gSignInWrapper').style.display = 'none';
-                    document.getElementById('taskForm').style.display = 'block';
-                }
-            })
-            .catch(error => {
-                console.error('Error:', error);
-            });
     </script>
 </body>
 </html>
