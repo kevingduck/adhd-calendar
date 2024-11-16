@@ -4,10 +4,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Task Scheduler</title>
+    <title>MegaTask</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/inter/3.19.3/inter.css">
     <style>
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
         .modal {
             display: none;
             position: fixed;
@@ -15,7 +22,8 @@
             left: 0;
             right: 0;
             bottom: 0;
-            background-color: rgba(0, 0, 0, 0.5);
+            background-color: rgba(0, 0, 0, 0.1);
+            backdrop-filter: blur(4px);
             z-index: 50;
         }
 
@@ -24,649 +32,672 @@
             align-items: center;
             justify-content: center;
         }
+
+        input:focus {
+            outline: none;
+            border-color: #000;
+        }
+
+        button:focus {
+            outline: none;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #f1f1f1;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
     </style>
 </head>
 
-<body class="bg-gray-100">
+<body class="bg-white">
     <div class="container mx-auto px-4 py-8 max-w-4xl">
         <!-- Welcome Section -->
-        <div class="mb-8">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h1 class="text-3xl font-bold text-blue-600 mb-4">MegaTask</h1>
-                <div class="grid md:grid-cols-2 gap-4">
-                    <div class="space-y-2">
-                        <h3 class="font-semibold text-lg">Creating Tasks</h3>
-                        <ul class="list-disc list-inside text-gray-600">
-                            <li>Enter your task in the input field below</li>
-                            <li>MegaTask will suggest steps and time estimates</li>
-                            <li>Adjust duration, date, and time as needed</li>
-                            <li>Review and confirm the schedule</li>
-                        </ul>
-                    </div>
-                    <div class="space-y-2">
-                        <h3 class="font-semibold text-lg">Calendar Integration</h3>
-                        <ul class="list-disc list-inside text-gray-600">
-                            <li>Add directly to Google Calendar</li>
-                            <li>Download as .ics file for other calendars</li>
-                            <li>Send email invites to team members</li>
-                            <li>Edit or delete tasks anytime</li>
-                        </ul>
-                    </div>
-                </div>
-            </div>
+        <div class="mb-16 mt-8">
+            <h1 class="text-5xl font-bold tracking-tight mb-4">MegaTask</h1>
+            <p class="text-gray-600 text-lg max-w-2xl leading-relaxed">An intelligent task scheduler that helps you
+                break down complex tasks and seamlessly integrate them with your calendar.</p>
         </div>
+
         <!-- Task Input -->
-        <div class="mb-8">
-            <div class="bg-white rounded-lg shadow p-6">
-                <h2 class="text-xl font-bold mb-4">Add New Task</h2>
-                <div class="flex gap-2">
+        <div class="mb-16">
+            <div class="max-w-2xl">
+                <label for="taskInput" class="block text-sm font-medium mb-2">What would you like to accomplish?</label>
+                <div class="flex gap-3">
                     <input type="text" id="taskInput"
-                        class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        placeholder="Enter your task...">
+                        class="flex-1 border-b border-gray-200 px-0 py-2 text-lg focus:border-black transition-colors"
+                        placeholder="Type your task here">
                     <button onclick="handleAddTask()"
-                        class="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                        Add
+                        class="px-6 py-2 bg-black text-white hover:bg-gray-800 transition-colors">
+                        Add Task
                     </button>
                 </div>
             </div>
         </div>
 
         <!-- Task List -->
-        <!-- Update the Task List section in your HTML -->
-        <div class="bg-white rounded-lg shadow overflow-x-auto">
-            <div class="p-4">
-                <h2 class="text-xl font-bold mb-4">Task List</h2>
-                <ul id="taskList" class="space-y-4">
-                    {% for task in tasks %}
-                    <li class="p-4 bg-gray-50 rounded-lg shadow group" data-task-id="{{ task.id }}">
-                        <div class="flex justify-between items-start">
-                            <div class="flex-grow">
-                                <h3 class="font-bold text-lg">{{ task.title }}</h3>
-                                <p class="text-gray-600">{{ task.start }} - {{ task.end }}</p>
-                                <ul class="list-disc list-inside text-gray-700 mt-2">
-                                    {% for step in task.steps %}
-                                    <li>{{ step }}</li>
-                                    {% endfor %}
-                                </ul>
+        <div>
+            <h2 class="text-2xl font-medium mb-8">Your Tasks</h2>
+            <ul id="taskList" class="space-y-8">
+                {% for task in tasks %}
+                <li class="border-b border-gray-100 pb-8 group" data-task-id="{{ task.id }}">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-grow max-w-2xl">
+                            <div class="flex items-baseline gap-4 mb-2">
+                                <h3 class="font-medium text-xl">{{ task.title }}</h3>
+                                <p class="text-gray-500 text-sm">{{ task.start }} - {{ task.end }}</p>
                             </div>
-                            <div class="flex items-center space-x-2">
-                                <!-- Calendar Actions -->
-                                <div class="flex space-x-1">
-                                    <button onclick="addToGoogleCalendarFromList(this)" title="Add to Google Calendar"
-                                        class="text-gray-500 hover:text-red-500 p-1">
-                                        <i class="fab fa-google"></i>
-                                    </button>
-                                    <button onclick="downloadICSFromList(this)" title="Download Calendar File"
-                                        class="text-gray-500 hover:text-gray-700 p-1">
-                                        <i class="far fa-calendar-alt"></i>
-                                    </button>
-                                    <button onclick="sendEmailInviteFromList(this)" title="Send Email Invite"
-                                        class="text-gray-500 hover:text-blue-500 p-1">
-                                        <i class="far fa-envelope"></i>
-                                    </button>
-                                </div>
-                                <!-- CRUD Actions -->
-                                <div class="flex space-x-1 ml-2 border-l pl-2">
-                                    <button onclick="editTask(this)" title="Edit Task"
-                                        class="text-gray-500 hover:text-blue-500 p-1">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <button onclick="deleteTask(this)" title="Delete Task"
-                                        class="text-gray-500 hover:text-red-500 p-1">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                </div>
+                            <ul class="space-y-2 text-gray-600">
+                                {% for step in task.steps %}
+                                <li class="flex items-baseline gap-2">
+                                    <span class="text-xs text-gray-400">○</span>
+                                    <span>{{ step }}</span>
+                                </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="flex items-center space-x-6">
+                            <!-- Calendar Actions -->
+                            <div class="flex space-x-4">
+                                <button onclick="addToGoogleCalendarFromList(this)" title="Add to Google Calendar"
+                                    class="text-gray-400 hover:text-black transition-colors">
+                                    <i class="fab fa-google"></i>
+                                </button>
+                                <button onclick="downloadICSFromList(this)" title="Download Calendar File"
+                                    class="text-gray-400 hover:text-black transition-colors">
+                                    <i class="far fa-calendar-alt"></i>
+                                </button>
+                                <!-- <button onclick="sendEmailInviteFromList(this)" title="Send Email Invite"
+                                    class="text-gray-400 hover:text-black transition-colors">
+                                    <i class="far fa-envelope"></i>
+                                </button> -->
+                            </div>
+                            <!-- CRUD Actions -->
+                            <div class="flex space-x-4 ml-2">
+                                <button onclick="editTask(this)" title="Edit Task"
+                                    class="text-gray-400 hover:text-black transition-colors">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <button onclick="deleteTask(this)" title="Delete Task"
+                                    class="text-gray-400 hover:text-black transition-colors">
+                                    <i class="fas fa-trash"></i>
+                                </button>
                             </div>
                         </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-            </div>
+                    </div>
+                </li>
+                {% endfor %}
+            </ul>
         </div>
-
         <!-- Add Edit Task Modal -->
         <div id="editTaskModal" class="modal">
-            <div class="bg-white rounded-lg shadow-lg max-w-xl w-full mx-4">
-                <div class="p-6">
-                    <div class="flex justify-between items-center mb-6">
-                        <h3 class="text-xl font-bold">Edit Task</h3>
-                        <button onclick="closeModal('editTaskModal')" class="text-gray-500 hover:text-gray-700">
+            <div class="bg-white max-w-2xl w-full mx-4 border border-gray-100">
+                <div class="p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="text-2xl font-medium">Edit Task</h3>
+                        <button onclick="closeModal('editTaskModal')"
+                            class="text-gray-400 hover:text-black transition-colors">
                             <i class="fas fa-times"></i>
                         </button>
                     </div>
 
-                    <div class="space-y-4">
+                    <div class="space-y-6">
                         <input type="hidden" id="editTaskId">
                         <!-- Task Title -->
                         <div>
-                            <label class="block text-sm font-medium mb-1">Task Title</label>
-                            <input type="text" id="editTaskTitle" class="w-full px-3 py-2 border rounded-lg">
+                            <label class="block text-sm font-medium mb-2">Task Title</label>
+                            <input type="text" id="editTaskTitle"
+                                class="w-full border-b border-gray-200 px-0 py-2 text-lg focus:border-black transition-colors">
                         </div>
 
                         <!-- Time Settings -->
-                        <div class="grid grid-cols-3 gap-4">
+                        <div class="grid grid-cols-3 gap-8">
                             <div>
-                                <label class="block text-sm font-medium mb-1">Duration (hours)</label>
+                                <label class="block text-sm font-medium mb-2">Duration (hours)</label>
                                 <input type="number" id="editModalDuration" min="0.5" step="0.5"
-                                    class="w-full px-3 py-2 border rounded-lg">
+                                    class="w-full border-b border-gray-200 px-0 py-2 focus:border-black transition-colors">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-1">Date</label>
-                                <input type="date" id="editModalDate" class="w-full px-3 py-2 border rounded-lg">
+                                <label class="block text-sm font-medium mb-2">Date</label>
+                                <input type="date" id="editModalDate"
+                                    class="w-full border-b border-gray-200 px-0 py-2 focus:border-black transition-colors">
                             </div>
                             <div>
-                                <label class="block text-sm font-medium mb-1">Time</label>
-                                <input type="time" id="editModalTime" class="w-full px-3 py-2 border rounded-lg">
+                                <label class="block text-sm font-medium mb-2">Time</label>
+                                <input type="time" id="editModalTime"
+                                    class="w-full border-b border-gray-200 px-0 py-2 focus:border-black transition-colors">
                             </div>
                         </div>
 
                         <!-- Steps -->
                         <div>
-                            <label class="block text-sm font-medium mb-1">Steps</label>
-                            <div id="editStepsContainer" class="space-y-2">
+                            <label class="block text-sm font-medium mb-2">Steps</label>
+                            <div id="editStepsContainer" class="space-y-3">
                                 <!-- Steps will be added here dynamically -->
                             </div>
-                            <button onclick="addStepInput()" class="mt-2 text-blue-500 hover:text-blue-600">
-                                <i class="fas fa-plus"></i> Add Step
+                            <button onclick="addStepInput()"
+                                class="mt-4 text-sm font-medium hover:text-gray-600 transition-colors">
+                                <i class="fas fa-plus text-xs mr-1"></i> Add Step
                             </button>
                         </div>
                     </div>
 
                     <!-- Buttons -->
-                    <div class="mt-6 flex justify-end gap-3">
+                    <div class="mt-8 flex justify-end gap-4">
                         <button onclick="closeModal('editTaskModal')"
-                            class="px-4 py-2 border rounded-lg hover:bg-gray-50">
+                            class="px-6 py-2 border border-gray-200 hover:border-gray-400 transition-colors">
                             Cancel
                         </button>
                         <button onclick="saveTaskEdit()"
-                            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600">
+                            class="px-6 py-2 bg-black text-white hover:bg-gray-800 transition-colors">
                             Save Changes
                         </button>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
-
-    <!-- Task Creation Modal -->
-    <div id="taskModal" class="modal">
-        <div class="bg-white rounded-lg shadow-lg max-w-xl w-full mx-4">
-            <div class="p-6">
-                <div class="flex justify-between items-center mb-6">
-                    <h3 class="text-xl font-bold">Confirm Task Schedule</h3>
-                    <button onclick="closeModal('taskModal')" class="text-gray-500 hover:text-gray-700">
-                        <i class="fas fa-times"></i>
-                    </button>
-                </div>
-
-                <div class="space-y-4">
-                    <!-- Task Details -->
-                    <div class="bg-gray-50 p-4 rounded-lg">
-                        <h4 class="font-semibold mb-2">Task</h4>
-                        <p id="modalTaskTitle" class="text-gray-700"></p>
+        <!-- Task Creation Modal -->
+        <div id="taskModal" class="modal">
+            <div class="bg-white max-w-2xl w-full mx-4 border border-gray-100">
+                <div class="p-8">
+                    <div class="flex justify-between items-center mb-8">
+                        <h3 class="text-2xl font-medium">Schedule Task</h3>
+                        <button onclick="closeModal('taskModal')"
+                            class="text-gray-400 hover:text-black transition-colors">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
 
-                    <!-- Time Settings -->
-                    <div class="grid grid-cols-3 gap-4">
+                    <div class="space-y-6">
+                        <!-- Task Details -->
                         <div>
-                            <label class="block text-sm font-medium mb-1">Duration (hours)</label>
-                            <input type="number" id="modalDuration" min="0.5" step="0.5"
-                                class="w-full px-3 py-2 border rounded-lg">
+                            <label class="block text-sm font-medium mb-2">Task</label>
+                            <p id="modalTaskTitle" class="text-lg"></p>
                         </div>
+
+                        <!-- Time Settings -->
+                        <div class="grid grid-cols-3 gap-8">
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Duration (hours)</label>
+                                <input type="number" id="modalDuration" min="0.5" step="0.5"
+                                    class="w-full border-b border-gray-200 px-0 py-2 focus:border-black transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Date</label>
+                                <input type="date" id="modalDate"
+                                    class="w-full border-b border-gray-200 px-0 py-2 focus:border-black transition-colors">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium mb-2">Time</label>
+                                <input type="time" id="modalTime"
+                                    class="w-full border-b border-gray-200 px-0 py-2 focus:border-black transition-colors"
+                                    min="09:00" max="17:00">
+                            </div>
+                        </div>
+
+                        <!-- Steps -->
                         <div>
-                            <label class="block text-sm font-medium mb-1">Date</label>
-                            <input type="date" id="modalDate" class="w-full px-3 py-2 border rounded-lg">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium mb-1">Time</label>
-                            <input type="time" id="modalTime" class="w-full px-3 py-2 border rounded-lg" min="09:00"
-                                max="17:00">
+                            <label class="block text-sm font-medium mb-2">Suggested Steps</label>
+                            <ul id="modalSteps" class="space-y-2">
+                            </ul>
                         </div>
                     </div>
 
-                    <!-- Steps -->
-                    <div class="bg-blue-50 p-4 rounded-lg">
-                        <h4 class="font-semibold mb-2">Suggested Steps</h4>
-                        <ul id="modalSteps" class="list-disc list-inside space-y-1 text-gray-700">
-                        </ul>
-                    </div>
-                </div>
+                    <!-- Calendar Integration and Buttons -->
+                    <div class="mt-8">
+                        <!-- Calendar Integration -->
+                        <div class="flex flex-wrap gap-4 justify-start mb-8">
+                            <button onclick="addToGoogleCalendar()"
+                                class="group flex items-center gap-2 px-4 py-2 border border-gray-200 hover:border-gray-400 transition-colors">
+                                <i class="fab fa-google text-gray-400 group-hover:text-black transition-colors"></i>
+                                <span>Add to Google Calendar</span>
+                            </button>
+                            <button onclick="downloadICS()"
+                                class="group flex items-center gap-2 px-4 py-2 border border-gray-200 hover:border-gray-400 transition-colors">
+                                <i
+                                    class="far fa-calendar-alt text-gray-400 group-hover:text-black transition-colors"></i>
+                                <span>Download for Calendar</span>
+                            </button>
+                            <button onclick="sendEmailInvite()"
+                                class="group flex items-center gap-2 px-4 py-2 border border-gray-200 hover:border-gray-400 transition-colors">
+                                <i class="far fa-envelope text-gray-400 group-hover:text-black transition-colors"></i>
+                                <span>Email Invite</span>
+                            </button>
+                        </div>
 
-                <!-- Calendar Integration and Buttons -->
-                <div class="mt-6 space-y-4">
-                    <!-- Calendar Integration -->
-                    <div class="flex flex-wrap gap-3 justify-center">
-                        <button onclick="addToGoogleCalendar()"
-                            class="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 flex items-center">
-                            <i class="fab fa-google mr-2"></i>Add to Google Calendar
-                        </button>
-                        <button onclick="downloadICS()"
-                            class="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 flex items-center">
-                            <i class="far fa-calendar-alt mr-2"></i>Download for Calendar
-                        </button>
-                        <button onclick="sendEmailInvite()"
-                            class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 flex items-center">
-                            <i class="far fa-envelope mr-2"></i>Email Invite
-                        </button>
-                    </div>
-
-                    <!-- Original Modal Buttons -->
-                    <div class="flex justify-end gap-3">
-                        <button onclick="closeModal('taskModal')" class="px-4 py-2 border rounded-lg hover:bg-gray-50">
-                            Cancel
-                        </button>
-                        <button onclick="confirmTask()"
-                            class="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600">
-                            Schedule Task
-                        </button>
+                        <!-- Original Modal Buttons -->
+                        <div class="flex justify-end gap-4">
+                            <button onclick="closeModal('taskModal')"
+                                class="px-6 py-2 border border-gray-200 hover:border-gray-400 transition-colors">
+                                Cancel
+                            </button>
+                            <button onclick="confirmTask()"
+                                class="px-6 py-2 bg-black text-white hover:bg-gray-800 transition-colors">
+                                Schedule Task
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
-    </div>
+        <script>
+            // Initialize variables in global scope
+            let currentTask = "";
+            let currentEstimate = null;
 
-    <script>
-        // Initialize variables in global scope
-        let currentTask = "";
-        let currentEstimate = null;
+            // Helper Functions
+            function generateICS(task, startTime, endTime, steps) {
+                const formatDateTime = (date) => {
+                    return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+                };
 
-        // Helper Functions
-        function generateICS(task, startTime, endTime, steps) {
-            const formatDateTime = (date) => {
-                return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
-            };
+                const start = formatDateTime(new Date(startTime));
+                const end = formatDateTime(new Date(endTime));
+                const description = steps.map(step => `- ${step}`).join('\\n');
 
-            const start = formatDateTime(new Date(startTime));
-            const end = formatDateTime(new Date(endTime));
-            const description = steps.map(step => `- ${step}`).join('\\n');
-
-            return `BEGIN:VCALENDAR
-VERSION:2.0
-BEGIN:VEVENT
-DTSTART:${start}
-DTEND:${end}
-SUMMARY:${task}
-DESCRIPTION:${description}
-END:VEVENT
-END:VCALENDAR`;
-        }
-
-        function closeModal(modalId) {
-            const modal = document.getElementById(modalId);
-            modal.classList.remove('active');
-        }
-
-        // Task Creation Functions
-        async function handleAddTask() {
-            const taskInput = document.getElementById('taskInput');
-            const task = taskInput.value.trim();
-
-            if (!task) {
-                alert('Please enter a task');
-                return;
+                return `BEGIN:VCALENDAR
+    VERSION:2.0
+    BEGIN:VEVENT
+    DTSTART:${start}
+    DTEND:${end}
+    SUMMARY:${task}
+    DESCRIPTION:${description}
+    END:VEVENT
+    END:VCALENDAR`;
             }
 
-            const addButton = document.querySelector('button[onclick="handleAddTask()"]');
-            const originalButtonText = addButton.innerHTML;
-            addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting estimate...';
-            addButton.disabled = true;
-
-            try {
-                const response = await fetch('/get_estimate', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ task })
-                });
-
-                const data = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(data.error || 'Failed to get estimate');
-                }
-
-                if (!data || typeof data.hours === 'undefined' || !Array.isArray(data.steps)) {
-                    throw new Error('Invalid estimate received');
-                }
-
-                currentTask = task;
-                currentEstimate = data;
-                showTaskModal(task, data);
-                taskInput.value = '';
-
-            } catch (error) {
-                console.error('Error:', error);
-                alert(error.message || 'Failed to get task estimate. Please try again.');
-            } finally {
-                addButton.innerHTML = originalButtonText;
-                addButton.disabled = false;
-            }
-        }
-
-        function showTaskModal(task, estimate) {
-            if (!task || !estimate) {
-                console.error('Invalid inputs to showTaskModal:', { task, estimate });
-                return;
+            function closeModal(modalId) {
+                const modal = document.getElementById(modalId);
+                modal.classList.remove('active');
             }
 
-            const modal = document.getElementById('taskModal');
-            const taskTitle = document.getElementById('modalTaskTitle');
-            const duration = document.getElementById('modalDuration');
-            const date = document.getElementById('modalDate');
-            const time = document.getElementById('modalTime');
-            const steps = document.getElementById('modalSteps');
+            // Task Creation Functions
+            async function handleAddTask() {
+                const taskInput = document.getElementById('taskInput');
+                const task = taskInput.value.trim();
 
-            const today = new Date().toISOString().split('T')[0];
-            date.value = today;
-
-            const nextHour = new Date();
-            nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
-            time.value = nextHour.toTimeString().slice(0, 5);
-
-            taskTitle.textContent = task;
-            duration.value = estimate.hours;
-
-            steps.innerHTML = '';
-            if (Array.isArray(estimate.steps)) {
-                estimate.steps.forEach(step => {
-                    const li = document.createElement('li');
-                    li.textContent = step;
-                    steps.appendChild(li);
-                });
-            }
-
-            modal.classList.add('active');
-        }
-
-        async function confirmTask() {
-            const duration = document.getElementById('modalDuration').value;
-            const date = document.getElementById('modalDate').value;
-            const time = document.getElementById('modalTime').value;
-
-            if (!duration || !date || !time) {
-                alert("Please fill in all fields.");
-                return;
-            }
-
-            try {
-                const response = await fetch('/add_task', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        task: currentTask,
-                        duration: duration,
-                        date: date,
-                        time: time,
-                        steps: currentEstimate.steps
-                    })
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    alert(error.error);
+                if (!task) {
+                    alert('Please enter a task');
                     return;
                 }
 
-                closeModal('taskModal');
-                location.reload();
+                const addButton = document.querySelector('button[onclick="handleAddTask()"]');
+                const originalButtonText = addButton.innerHTML;
+                addButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Getting estimate...';
+                addButton.disabled = true;
 
-            } catch (error) {
-                console.error('Error:', error);
-                alert('Failed to schedule task');
+                try {
+                    const response = await fetch('/get_estimate', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ task })
+                    });
+
+                    const data = await response.json();
+
+                    if (!response.ok) {
+                        throw new Error(data.error || 'Failed to get estimate');
+                    }
+
+                    if (!data || typeof data.hours === 'undefined' || !Array.isArray(data.steps)) {
+                        throw new Error('Invalid estimate received');
+                    }
+
+                    currentTask = task;
+                    currentEstimate = data;
+                    showTaskModal(task, data);
+                    taskInput.value = '';
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert(error.message || 'Failed to get task estimate. Please try again.');
+                } finally {
+                    addButton.innerHTML = originalButtonText;
+                    addButton.disabled = false;
+                }
             }
-        }
+            function showTaskModal(task, estimate) {
+                if (!task || !estimate) {
+                    console.error('Invalid inputs to showTaskModal:', { task, estimate });
+                    return;
+                }
 
-        // Calendar Functions for New Tasks
-        function addToGoogleCalendar() {
-            const task = document.getElementById('modalTaskTitle').textContent;
-            const date = document.getElementById('modalDate').value;
-            const time = document.getElementById('modalTime').value;
-            const duration = document.getElementById('modalDuration').value;
-            const steps = Array.from(document.getElementById('modalSteps').children)
-                .map(li => li.textContent);
+                const modal = document.getElementById('taskModal');
+                const taskTitle = document.getElementById('modalTaskTitle');
+                const duration = document.getElementById('modalDuration');
+                const date = document.getElementById('modalDate');
+                const time = document.getElementById('modalTime');
+                const steps = document.getElementById('modalSteps');
 
-            const startDateTime = new Date(`${date}T${time}`);
-            const endDateTime = new Date(startDateTime.getTime() + (duration * 60 * 60 * 1000));
+                const today = new Date().toISOString().split('T')[0];
+                date.value = today;
 
-            const startFormatted = startDateTime.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
-            const endFormatted = endDateTime.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
+                const nextHour = new Date();
+                nextHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+                time.value = nextHour.toTimeString().slice(0, 5);
 
-            const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(task)}&dates=${startFormatted}/${endFormatted}&details=${encodeURIComponent(steps.join('\n'))}`;
+                taskTitle.textContent = task;
+                duration.value = estimate.hours;
 
-            window.open(url, '_blank');
-        }
+                steps.innerHTML = '';
+                if (Array.isArray(estimate.steps)) {
+                    estimate.steps.forEach(step => {
+                        const li = document.createElement('li');
+                        li.className = "flex items-baseline gap-2";
+                        li.innerHTML = `
+                        <span class="text-xs text-gray-400">○</span>
+                        <span>${step}</span>
+                    `;
+                        steps.appendChild(li);
+                    });
+                }
 
-        function downloadICS() {
-            const task = document.getElementById('modalTaskTitle').textContent;
-            const date = document.getElementById('modalDate').value;
-            const time = document.getElementById('modalTime').value;
-            const duration = document.getElementById('modalDuration').value;
+                modal.classList.add('active');
+            }
 
-            const startDateTime = new Date(`${date}T${time}`);
-            const endDateTime = new Date(startDateTime.getTime() + (duration * 60 * 60 * 1000));
-            const steps = Array.from(document.getElementById('modalSteps').children)
-                .map(li => li.textContent);
+            async function confirmTask() {
+                const duration = document.getElementById('modalDuration').value;
+                const date = document.getElementById('modalDate').value;
+                const time = document.getElementById('modalTime').value;
 
-            const icsContent = generateICS(task, startDateTime, endDateTime, steps);
+                if (!duration || !date || !time) {
+                    alert("Please fill in all fields.");
+                    return;
+                }
 
-            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-            const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = `${task.substring(0, 30)}.ics`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
+                try {
+                    const response = await fetch('/add_task', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            task: currentTask,
+                            duration: duration,
+                            date: date,
+                            time: time,
+                            steps: currentEstimate.steps
+                        })
+                    });
 
-        function sendEmailInvite() {
-            const task = document.getElementById('modalTaskTitle').textContent;
-            const date = document.getElementById('modalDate').value;
-            const time = document.getElementById('modalTime').value;
-            const duration = document.getElementById('modalDuration').value;
+                    if (!response.ok) {
+                        const error = await response.json();
+                        alert(error.error);
+                        return;
+                    }
 
-            const startDateTime = new Date(`${date}T${time}`);
-            const dateStr = startDateTime.toLocaleDateString();
-            const timeStr = startDateTime.toLocaleTimeString();
+                    closeModal('taskModal');
+                    location.reload();
 
-            const steps = Array.from(document.getElementById('modalSteps').children)
-                .map(li => li.textContent)
-                .join('\n');
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert('Failed to schedule task');
+                }
+            }
 
-            const subject = encodeURIComponent(`Task: ${task}`);
-            const body = encodeURIComponent(
-                `Task: ${task}\n` +
-                `Date: ${dateStr}\n` +
-                `Time: ${timeStr}\n` +
-                `Duration: ${duration} hours\n\n` +
-                `Steps:\n${steps}`
-            );
+            // Calendar Functions for New Tasks
+            function addToGoogleCalendar() {
+                const task = document.getElementById('modalTaskTitle').textContent;
+                const date = document.getElementById('modalDate').value;
+                const time = document.getElementById('modalTime').value;
+                const duration = document.getElementById('modalDuration').value;
+                const steps = Array.from(document.getElementById('modalSteps').children)
+                    .map(li => li.querySelector('span:last-child').textContent);
 
-            window.location.href = `mailto:?subject=${subject}&body=${body}`;
-        }
+                const startDateTime = new Date(`${date}T${time}`);
+                const endDateTime = new Date(startDateTime.getTime() + (duration * 60 * 60 * 1000));
 
-        // Edit Task Functions
-        function editTask(button) {
-            const taskItem = button.closest('li');
-            const taskId = taskItem.dataset.taskId;
-            const title = taskItem.querySelector('h3').textContent;
-            const timeRange = taskItem.querySelector('p').textContent;
-            const steps = Array.from(taskItem.querySelectorAll('ul.list-disc li')).map(li => li.textContent);
+                const startFormatted = startDateTime.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
+                const endFormatted = endDateTime.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
 
-            const [startStr, endStr] = timeRange.split(' - ');
-            const start = new Date(startStr);
-            const end = new Date(endStr);
-            const duration = (end - start) / (1000 * 60 * 60);
+                const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(task)}&dates=${startFormatted}/${endFormatted}&details=${encodeURIComponent(steps.join('\n'))}`;
 
-            document.getElementById('editTaskId').value = taskId;
-            document.getElementById('editTaskTitle').value = title;
-            document.getElementById('editModalDuration').value = duration;
-            document.getElementById('editModalDate').value = start.toISOString().split('T')[0];
-            document.getElementById('editModalTime').value = start.toTimeString().slice(0, 5);
+                window.open(url, '_blank');
+            }
+            function downloadICS() {
+                const task = document.getElementById('modalTaskTitle').textContent;
+                const date = document.getElementById('modalDate').value;
+                const time = document.getElementById('modalTime').value;
+                const duration = document.getElementById('modalDuration').value;
 
-            const stepsContainer = document.getElementById('editStepsContainer');
-            stepsContainer.innerHTML = '';
-            steps.forEach(step => {
+                const startDateTime = new Date(`${date}T${time}`);
+                const endDateTime = new Date(startDateTime.getTime() + (duration * 60 * 60 * 1000));
+                const steps = Array.from(document.getElementById('modalSteps').children)
+                    .map(li => li.querySelector('span:last-child').textContent);
+
+                const icsContent = generateICS(task, startDateTime, endDateTime, steps);
+
+                const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = `${task.substring(0, 30)}.ics`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            function sendEmailInvite() {
+                const task = document.getElementById('modalTaskTitle').textContent;
+                const date = document.getElementById('modalDate').value;
+                const time = document.getElementById('modalTime').value;
+                const duration = document.getElementById('modalDuration').value;
+
+                const startDateTime = new Date(`${date}T${time}`);
+                const dateStr = startDateTime.toLocaleDateString();
+                const timeStr = startDateTime.toLocaleTimeString();
+
+                const steps = Array.from(document.getElementById('modalSteps').children)
+                    .map(li => li.querySelector('span:last-child').textContent)
+                    .join('\n');
+
+                const subject = encodeURIComponent(`Task: ${task}`);
+                const body = encodeURIComponent(
+                    `Task: ${task}\n` +
+                    `Date: ${dateStr}\n` +
+                    `Time: ${timeStr}\n` +
+                    `Duration: ${duration} hours\n\n` +
+                    `Steps:\n${steps}`
+                );
+
+                window.location.href = `mailto:?subject=${subject}&body=${body}`;
+            }
+
+            // Calendar Functions for Listed Tasks
+            function addToGoogleCalendarFromList(button) {
+                const taskItem = button.closest('li');
+                const title = taskItem.querySelector('h3').textContent;
+                const timeRange = taskItem.querySelector('p').textContent;
+                const steps = Array.from(taskItem.querySelectorAll('ul li span:last-child'))
+                    .map(span => span.textContent);
+
+                const [startStr, endStr] = timeRange.split(' - ');
+                const startDateTime = new Date(startStr);
+                const endDateTime = new Date(endStr);
+
+                const startFormatted = startDateTime.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
+                const endFormatted = endDateTime.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
+
+                const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startFormatted}/${endFormatted}&details=${encodeURIComponent(steps.join('\n'))}`;
+
+                window.open(url, '_blank');
+            }
+
+            function downloadICSFromList(button) {
+                const taskItem = button.closest('li');
+                const title = taskItem.querySelector('h3').textContent;
+                const timeRange = taskItem.querySelector('p').textContent;
+                const steps = Array.from(taskItem.querySelectorAll('ul li span:last-child'))
+                    .map(span => span.textContent);
+
+                const [startStr, endStr] = timeRange.split(' - ');
+                const startDateTime = new Date(startStr);
+                const endDateTime = new Date(endStr);
+
+                const icsContent = generateICS(title, startDateTime, endDateTime, steps);
+
+                const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
+                const link = document.createElement('a');
+                link.href = window.URL.createObjectURL(blob);
+                link.download = `${title.substring(0, 30)}.ics`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+
+            function sendEmailInviteFromList(button) {
+                const taskItem = button.closest('li');
+                const title = taskItem.querySelector('h3').textContent;
+                const timeRange = taskItem.querySelector('p').textContent;
+                const steps = Array.from(taskItem.querySelectorAll('ul li span:last-child'))
+                    .map(span => span.textContent)
+                    .join('\n');
+
+                const [startStr] = timeRange.split(' - ');
+                const startDateTime = new Date(startStr);
+                const dateStr = startDateTime.toLocaleDateString();
+                const timeStr = startDateTime.toLocaleTimeString();
+
+                const subject = encodeURIComponent(`Task: ${title}`);
+                const body = encodeURIComponent(
+                    `Task: ${title}\n` +
+                    `Date: ${dateStr}\n` +
+                    `Time: ${timeStr}\n` +
+                    `Duration: ${((new Date(timeRange.split(' - ')[1]) - startDateTime) / (1000 * 60 * 60)).toFixed(1)} hours\n\n` +
+                    `Steps:\n${steps}`
+                );
+
+                window.location.href = `mailto:?subject=${subject}&body=${body}`;
+            }
+
+            // Edit Task Functions
+            function editTask(button) {
+                const taskItem = button.closest('li');
+                const taskId = taskItem.dataset.taskId;
+                const title = taskItem.querySelector('h3').textContent;
+                const timeRange = taskItem.querySelector('p').textContent;
+                const steps = Array.from(taskItem.querySelectorAll('ul li span:last-child')).map(span => span.textContent);
+
+                const [startStr, endStr] = timeRange.split(' - ');
+                const start = new Date(startStr);
+                const end = new Date(endStr);
+                const duration = (end - start) / (1000 * 60 * 60);
+
+                document.getElementById('editTaskId').value = taskId;
+                document.getElementById('editTaskTitle').value = title;
+                document.getElementById('editModalDuration').value = duration;
+                document.getElementById('editModalDate').value = start.toISOString().split('T')[0];
+                document.getElementById('editModalTime').value = start.toTimeString().slice(0, 5);
+
+                const stepsContainer = document.getElementById('editStepsContainer');
+                stepsContainer.innerHTML = '';
+                steps.forEach(step => {
+                    const stepDiv = document.createElement('div');
+                    stepDiv.className = 'flex gap-2';
+                    stepDiv.innerHTML = `
+                    <input type="text" value="${step}" class="flex-grow border-b border-gray-200 px-0 py-2 focus:border-black transition-colors">
+                    <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-black transition-colors">
+                        <i class="fas fa-times"></i>
+                    </button>
+                `;
+                    stepsContainer.appendChild(stepDiv);
+                });
+
+                document.getElementById('editTaskModal').classList.add('active');
+            }
+
+            function addStepInput() {
                 const stepDiv = document.createElement('div');
                 stepDiv.className = 'flex gap-2';
                 stepDiv.innerHTML = `
-            <input type="text" value="${step}" class="flex-grow px-3 py-2 border rounded-lg">
-            <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700">
-                <i class="fas fa-times"></i>
-            </button>
-        `;
-                stepsContainer.appendChild(stepDiv);
+                <input type="text" class="flex-grow border-b border-gray-200 px-0 py-2 focus:border-black transition-colors" placeholder="Enter step...">
+                <button onclick="this.parentElement.remove()" class="text-gray-400 hover:text-black transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+                document.getElementById('editStepsContainer').appendChild(stepDiv);
+            }
+
+            async function saveTaskEdit() {
+                const taskId = document.getElementById('editTaskId').value;
+                const title = document.getElementById('editTaskTitle').value;
+                const duration = document.getElementById('editModalDuration').value;
+                const date = document.getElementById('editModalDate').value;
+                const time = document.getElementById('editModalTime').value;
+
+                const steps = Array.from(document.getElementById('editStepsContainer').children)
+                    .map(div => div.querySelector('input').value)
+                    .filter(step => step.trim() !== '');
+
+                try {
+                    const response = await fetch(`/update_task/${taskId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            task: title,
+                            duration: duration,
+                            date: date,
+                            time: time,
+                            steps: steps
+                        })
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to update task');
+                    }
+
+                    location.reload();
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert(error.message || 'Failed to update task');
+                }
+            }
+
+            async function deleteTask(button) {
+                if (!confirm('Are you sure you want to delete this task?')) {
+                    return;
+                }
+
+                const taskItem = button.closest('li');
+                const taskId = taskItem.dataset.taskId;
+
+                try {
+                    const response = await fetch(`/delete_task/${taskId}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (!response.ok) {
+                        const error = await response.json();
+                        throw new Error(error.error || 'Failed to delete task');
+                    }
+
+                    taskItem.remove();
+
+                } catch (error) {
+                    console.error('Error:', error);
+                    alert(error.message || 'Failed to delete task');
+                }
+            }
+
+            // Add event listener for enter key on task input
+            document.getElementById('taskInput').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    handleAddTask();
+                }
             });
-
-            document.getElementById('editTaskModal').classList.add('active');
-        }
-
-        function addStepInput() {
-            const stepDiv = document.createElement('div');
-            stepDiv.className = 'flex gap-2';
-            stepDiv.innerHTML = `
-        <input type="text" class="flex-grow px-3 py-2 border rounded-lg" placeholder="Enter step...">
-        <button onclick="this.parentElement.remove()" class="text-red-500 hover:text-red-700">
-            <i class="fas fa-times"></i>
-        </button>
-    `;
-            document.getElementById('editStepsContainer').appendChild(stepDiv);
-        }
-
-        async function saveTaskEdit() {
-            const taskId = document.getElementById('editTaskId').value;
-            const title = document.getElementById('editTaskTitle').value;
-            const duration = document.getElementById('editModalDuration').value;
-            const date = document.getElementById('editModalDate').value;
-            const time = document.getElementById('editModalTime').value;
-
-            const steps = Array.from(document.getElementById('editStepsContainer').children)
-                .map(div => div.querySelector('input').value)
-                .filter(step => step.trim() !== '');
-
-            try {
-                const response = await fetch(`/update_task/${taskId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        task: title,
-                        duration: duration,
-                        date: date,
-                        time: time,
-                        steps: steps
-                    })
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to update task');
-                }
-
-                location.reload();
-
-            } catch (error) {
-                console.error('Error:', error);
-                alert(error.message || 'Failed to update task');
-            }
-        }
-
-        async function deleteTask(button) {
-            if (!confirm('Are you sure you want to delete this task?')) {
-                return;
-            }
-
-            const taskItem = button.closest('li');
-            const taskId = taskItem.dataset.taskId;
-
-            try {
-                const response = await fetch(`/delete_task/${taskId}`, {
-                    method: 'DELETE'
-                });
-
-                if (!response.ok) {
-                    const error = await response.json();
-                    throw new Error(error.error || 'Failed to delete task');
-                }
-
-                taskItem.remove();
-
-            } catch (error) {
-                console.error('Error:', error);
-                alert(error.message || 'Failed to delete task');
-            }
-        }
-
-        // Calendar Functions for List Items
-        function addToGoogleCalendarFromList(button) {
-            const taskItem = button.closest('li');
-            const title = taskItem.querySelector('h3').textContent;
-            const timeRange = taskItem.querySelector('p').textContent;
-            const steps = Array.from(taskItem.querySelectorAll('ul.list-disc li')).map(li => li.textContent);
-
-            const [startTimeStr, endTimeStr] = timeRange.split(' - ');
-            const startDate = new Date(startTimeStr);
-            const endDate = new Date(endTimeStr);
-
-            const startFormatted = startDate.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
-            const endFormatted = endDate.toISOString().replace(/[:-]/g, '').replace(/\.\d{3}/, '');
-
-            const url = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(title)}&dates=${startFormatted}/${endFormatted}&details=${encodeURIComponent(steps.join('\n'))}`;
-
-            window.open(url, '_blank');
-        }
-
-        function downloadICSFromList(button) {
-            const taskItem = button.closest('li');
-            const title = taskItem.querySelector('h3').textContent;
-            const timeRange = taskItem.querySelector('p').textContent;
-            const steps = Array.from(taskItem.querySelectorAll('ul.list-disc li')).map(li => li.textContent);
-
-            const [startTimeStr, endTimeStr] = timeRange.split(' - ');
-            const startDate = new Date(startTimeStr);
-            const endDate = new Date(endTimeStr);
-
-            const icsContent = generateICS(title, startDate, endDate, steps);
-
-            const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
-            const link = document.createElement('a');
-            link.href = window.URL.createObjectURL(blob);
-            link.download = `${title.substring(0, 30)}.ics`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        function sendEmailInviteFromList(button) {
-            const taskItem = button.closest('li');
-            const title = taskItem.querySelector('h3').textContent;
-            const timeRange = taskItem.querySelector('p').textContent;
-            const steps = Array.from(taskItem.querySelectorAll('ul.list-disc li')).map(li => li.textContent);
-
-            const [startTimeStr, endTimeStr] = timeRange.split(' - ');
-            const startDate = new Date(startTimeStr);
-            const duration = (new Date(endTimeStr) - startDate) / (1000 * 60 * 60);
-
-            const dateStr = startDate.toLocaleDateString();
-            const timeStr = startDate.toLocaleTimeString();
-
-            const subject = encodeURIComponent(`Task: ${title}`);
-            const body = encodeURIComponent(
-                `Task: ${title}\n` +
-                `Date: ${dateStr}\n` +
-                `Time: ${timeStr}\n` +
-                `Duration: ${duration} hours\n\n` +
-                `Steps:\n${steps.join('\n')}`
-            );
-
-            window.location.href = `mailto:?subject=${subject}&body=${body}`;
-        }
-
-        // Add event listener for enter key on task input
-        document.getElementById('taskInput').addEventListener('keypress', function (e) {
-            if (e.key === 'Enter') {
-                handleAddTask();
-            }
-        });
-    </script>
-
+        </script>
 </body>
 
 </html>
